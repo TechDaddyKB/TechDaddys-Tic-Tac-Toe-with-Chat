@@ -1,6 +1,7 @@
 """Exercise the real controller and file:// overlay in a local Chromium browser."""
 
 import argparse
+import re
 import tempfile
 import threading
 import time
@@ -65,7 +66,9 @@ def main() -> None:
                 )
                 expect(overlay.locator("#voteBanner")).to_contain_text("CHAT: VOTE")
                 expect(overlay.locator("#voteBanner")).not_to_contain_text("1–9")
-                expect(overlay.locator("#voteBanner")).to_contain_text("30s")
+                expect(overlay.locator("#voteBanner")).to_have_text(
+                    re.compile(r"CHAT: VOTE · (?:[0-9]|[12][0-9]|30)s")
+                )
                 metrics = overlay.evaluate("""() => ({
                     background:getComputedStyle(document.body).backgroundColor,
                     board:document.getElementById('board').getBoundingClientRect().width,
