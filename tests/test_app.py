@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from vtuber_tictactoe.app import MARKER, Application, Settings, make_handler
+from vtuber_tictactoe.app import MARKER, Application, Settings, asset, make_handler
 
 
 @pytest.fixture
@@ -23,7 +23,8 @@ def test_settings_roundtrip_and_no_oauth_secrets(tmp_path: Path) -> None:
     settings.save()
     copy = Settings.load(tmp_path)
     assert copy.overlay_token == settings.overlay_token
-    assert copy.channel == "channel" and copy.client_id == "public-client"
+    assert copy.channel == "channel"
+    assert copy.client_id == asset("twitch-client-id.txt").strip()
     assert "access_token" not in copy.file.read_text()
     settings.file.write_text('{"overlay_token":"bad/", "port":80,"channel":7}')
     copy = Settings.load(tmp_path)
@@ -114,7 +115,8 @@ def test_connect_saves_only_public_settings(
     app: Application, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(app.twitch, "connect", lambda *a: {"user_code": "CODE"})
-    result = app.action("connect", {"client_id": "client", "channel": "#CHANNEL"})
+    app.settings.client_id = "client"
+    result = app.action("connect", {"channel": "#CHANNEL"})
     assert result == {"user_code": "CODE"}
     assert app.settings.channel == "channel"
     assert "access_token" not in app.settings.file.read_text()

@@ -36,18 +36,24 @@ def main() -> None:
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.goto(app.base + "/controller#" + app.control_token)
                 expect(page.locator("#board button")).to_have_count(9)
+                expect(page.locator("#clientId")).to_have_count(0)
                 page.locator("#practice").click()
                 expect(page.locator("#practiceFields")).to_be_visible()
-                page.locator("#start").click()
+                expect(page.locator("#practice")).to_have_text("Test mode")
+                page.locator("#testChatFirst").click()
                 expect(page.locator("#start")).to_be_disabled()
-                with app.lock:
-                    app.game.reset()
-                    app.game.start("streamer", time.monotonic(), time.time())
+                page.locator("#testText").fill("1")
+                page.locator("#testVote").click()
+                expect(page.locator("#voteSummary")).to_contain_text("1 unique vote")
+                page.locator("#testVote").click()
+                expect(page.locator("#voteSummary")).to_contain_text("1 unique vote")
+                page.locator("#finishTestVote").click()
+                expect(page.locator("#board button").nth(0)).to_have_class("cell filled o")
                 page.locator("#board button").nth(4).click()
                 expect(page.locator("#board button").nth(4)).to_have_class("cell selected")
                 page.locator("#confirm").click()
                 expect(page.locator("#phase")).to_contain_text("chat")
-                page.locator("#testText").fill("1")
+                page.locator("#testText").fill("2")
                 page.locator("#testVote").click()
                 expect(page.locator(".votecount")).to_have_text("1 vote")
 
@@ -58,6 +64,8 @@ def main() -> None:
                     "getComputedStyle(document.getElementById('item')).opacity==='1'"
                 )
                 expect(overlay.locator("#voteBanner")).to_contain_text("CHAT: VOTE")
+                expect(overlay.locator("#voteBanner")).not_to_contain_text("1–9")
+                expect(overlay.locator("#voteBanner")).to_contain_text("30s")
                 metrics = overlay.evaluate("""() => ({
                     background:getComputedStyle(document.body).backgroundColor,
                     board:document.getElementById('board').getBoundingClientRect().width,
@@ -93,11 +101,11 @@ def main() -> None:
                 )
                 with app.lock:
                     app.game.resume(time.monotonic(), time.time())
-                    app.game.tick(app.game.deadline)
+                page.locator("#finishTestVote").click()
                 overlay.wait_for_function(
                     "getComputedStyle(document.getElementById('voteBanner')).visibility==='hidden'"
                 )
-                assert app.game.board[0] == "O"
+                assert app.game.board[1] == "O"
 
                 page.set_viewport_size({"width": 390, "height": 844})
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")

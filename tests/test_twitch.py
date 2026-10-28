@@ -17,15 +17,21 @@ def test_tagged_message_with_stable_identity_and_timestamp() -> None:
 @pytest.mark.parametrize(
     "line",
     [
-        ":stream!stream@host PRIVMSG #stream :1",
         ":alice!a@host PRIVMSG #elsewhere :1",
         "PING :tmi.twitch.tv",
         ":alice!a@host JOIN #stream",
         "@user-id=2;room-id=1;source-room-id=9 :alice!a@host PRIVMSG #stream :1",
     ],
 )
-def test_non_vote_events_owner_and_shared_chat_are_rejected(line: str) -> None:
+def test_non_vote_events_and_other_rooms_are_rejected(line: str) -> None:
     assert parse_message(line, "stream") is None
+
+
+def test_broadcaster_can_vote_in_their_own_chat() -> None:
+    assert parse_message(
+        "@badges=broadcaster/1;user-id=42;room-id=42;tmi-sent-ts=1234000 :stream!stream@host PRIVMSG #stream :1",
+        "stream",
+    ) == ("42", "1", 1234.0)
 
 
 def test_login_fallback_and_malformed_timestamp() -> None:

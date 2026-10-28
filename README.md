@@ -10,7 +10,7 @@ A portable Windows/Linux Twitch chat game with a numbered, transparent VTube Stu
 2. Windows: double-click `TechDaddyTicTacToe.exe`.
    Linux x86_64: run `./TechDaddyTicTacToe` (mark it executable in Properties if needed).
 3. The controller opens in your normal browser. No Python, Node, pip, or package installs are needed.
-4. Click **Practice mode**, then **Randomize who starts** to try it without Twitch.
+4. Click **Test mode**, then **Randomize who starts** to try it without Twitch.
 5. Click **Install HTML…** and save the item in VTube Studio's Items folder.
    Alternatively copy the included `tic-tac-toe.html` there, then **Browse existing…** to link it.
 6. In VTube Studio, add a **Web Item**, allow local file access in its settings,
@@ -18,7 +18,7 @@ A portable Windows/Linux Twitch chat game with a numbered, transparent VTube Stu
    Use approximately 900 × 1024 pixels, a transparent background, then move and pin it to the model.
 7. The controller's **Board visible / hidden** button changes visibility without unloading the item.
    Visibility does not pause voting. Use **Pause voting** separately.
-8. Turn Practice mode off before logging into Twitch.
+8. Turn Test mode off before logging into Twitch.
 
 Close the controller with **Quit controller**. Closing its browser tab alone leaves the controller running.
 The overlay hides automatically after about 2.5 seconds if the controller stops responding.
@@ -30,12 +30,12 @@ This build includes the public Client ID supplied for this application. Streamer
 use **Log in with Twitch** immediately; they do not need to register an app or install
 any developer tools. The developer setup below is only for replacing that registration.
 
-For personal testing:
+For developers replacing the bundled app registration:
 
 1. Register an app at https://dev.twitch.tv/console/apps using a verified Twitch account with 2FA.
 2. Set the application's **Client Type to Public**, and choose a suitable category such as Chat Bot.
    If a redirect URI is required, use `http://localhost`; this app's device login does not use redirects.
-3. Paste the public **Client ID** into the controller. Do not paste or distribute a client secret.
+3. Put the public **Client ID** in `src/vtuber_tictactoe/assets/twitch-client-id.txt` and rebuild. Do not distribute a client secret. The controller has no Client ID field.
 4. Enter the Twitch channel name or its `https://twitch.tv/channel` link, then click **Log in with Twitch**.
    Leave it blank to use the signed-in account's own channel.
 5. Open the displayed Twitch authorization link, sign in, and enter the displayed device code if asked.
@@ -59,6 +59,19 @@ For distribution, put your registered app's public Client ID in
 `src/vtuber_tictactoe/assets/twitch-client-id.txt` before building. It is included automatically in both native builds.
 The Client ID is public, but must belong to this application, not another developer's app.
 
+## Test mode (no Twitch account needed)
+
+Turn on **Test mode** in The audience panel while Twitch is disconnected. Use **Test: streamer first**
+or **Test: chat first** to choose a starting side, or randomize it. Cast a simulated vote using the
+viewer-name and number fields. Each simulated viewer still gets one vote; change the viewer name to
+simulate another person. **Finish test vote now** resolves the votes immediately without waiting
+30 seconds. That shortcut is unavailable in normal connected play.
+
+To test the real Twitch connection, turn Test mode off, log in, and send a number in your own channel
+while the board says it is chat's turn. Your channel can be offline. Your own account's messages count.
+The controller shows received chat messages and unique votes so you can see the connection working.
+Sending `1` several times from the same account counts as **one** vote for square 1.
+
 ## Playing
 
 - **Randomize who starts** gives either side the first turn. Streamer is always X; chat is O.
@@ -68,14 +81,15 @@ The Client ID is public, but must belong to this application, not another develo
   Spaces around the digit are allowed. Messages such as `vote 5`, `!5`, or `1 2` are ignored.
 - Each viewer has one vote per chat turn. Their latest valid vote replaces their previous vote.
   Repeated messages from the same person do not add extra votes.
-- The channel owner's messages and messages originating from other shared-chat rooms are ignored.
+- The channel owner's own messages count too, so you can test through your own offline channel.
+  Messages originating from other shared-chat rooms are ignored.
 - At 30 seconds, the highest count wins. Ties are chosen randomly among tied leaders.
 - If nobody votes, no mark is placed. Use **Reopen voting** for another 30 seconds.
 - Pause preserves the current votes and remaining time. Disconnects automatically pause a chat
   turn. After reconnecting, click **Resume voting** yourself.
 - A win or draw stops play. Start a rematch or reset the game. Scores last for this controller session.
 - Hiding the board affects only the HTML item. The controller's board stays available.
-- While chat votes, a board-width **CHAT: VOTE 1–9** banner pulses below the grid.
+- While chat votes, a board-width **CHAT: VOTE** banner pulses below the grid.
   Pausing changes it to a static **VOTING PAUSED** banner; other turns hide it.
 - **Your colors** customizes grid lines, numbers, X, O, banner background and banner text.
   A live sample preview shows both marks and the banner. Changes save automatically and

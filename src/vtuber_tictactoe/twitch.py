@@ -85,7 +85,7 @@ def parse_message(line: str, channel: str) -> tuple[str, str, float | None] | No
             key, _, value = tag.partition("=")
             tags[key] = value
     match = re.fullmatch(r":([^! ]+)![^ ]+ PRIVMSG #([^ ]+) :(.*)", line)
-    if match is None or match[2].lower() != channel or match[1].lower() == channel:
+    if match is None or match[2].lower() != channel:
         return None
     # Shared-chat messages originating in other rooms must not vote here.
     source_room, room = tags.get("source-room-id"), tags.get("room-id")

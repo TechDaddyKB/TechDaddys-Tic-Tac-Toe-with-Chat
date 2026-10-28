@@ -34,7 +34,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif;color:#fff;display:grid;place-i
 <body><main id="item" aria-label="Stream versus chat tic-tac-toe">
 <div class="header"><span class="pink">STREAM <span class="versus">VS</span> <span class="mint">CHAT</span></span><span id="status">READY</span></div>
 <div class="board" id="board"><svg class="grid" viewBox="0 0 100 100"><path d="M33.33 3V97 M66.67 3V97 M3 33.33H97 M3 66.67H97"/></svg></div>
-<div id="voteBanner" aria-live="polite">CHAT: VOTE 1–9</div>
+<div id="voteBanner" aria-live="polite">CHAT: VOTE</div>
 <div id="footer">X · streamer &nbsp; / &nbsp; O · chat</div>
 </main><script>
 'use strict';
@@ -51,8 +51,8 @@ function render(s){
  if(c.dataset.mark!==v){c.querySelector('.mark')?.remove();if(v){const shape=v==='X'?'<path d="M20 20L80 80 M80 20L20 80"/>':'<circle cx="50" cy="50" r="34"/>';c.insertAdjacentHTML('beforeend','<svg class="mark '+v.toLowerCase()+'" viewBox="0 0 100 100">'+shape+'</svg>')}c.dataset.mark=v}});
  const status=document.getElementById('status'), footer=document.getElementById('footer');
  status.textContent=s.phase==='chat'?(s.paused?'PAUSED':s.seconds+'s · VOTE'):s.phase==='streamer'?"STREAMER'S TURN":s.phase==='over'?'GG ♡':s.phase==='no_votes'?'NO VOTES':'READY';
- footer.textContent=s.phase==='chat'?(s.paused?'Voting paused':'Type 1–9 in chat · '+s.voters+' vote'+(s.voters===1?'':'s')):s.phase==='over'?s.message:s.phase==='no_votes'?'Waiting to reopen voting':'X · streamer  /  O · chat';
- const banner=document.getElementById('voteBanner');banner.className=s.phase==='chat'?(s.paused?'paused':'voting'):'';banner.textContent=s.paused?'VOTING PAUSED':'CHAT: VOTE 1–9 · '+s.seconds+'s';
+ footer.textContent=s.phase==='chat'?(s.paused?'Voting paused':'Vote in chat · '+s.voters+' vote'+(s.voters===1?'':'s')):s.phase==='over'?s.message:s.phase==='no_votes'?'Waiting to reopen voting':'X · streamer  /  O · chat';
+ const banner=document.getElementById('voteBanner');banner.className=s.phase==='chat'?(s.paused?'paused':'voting'):'';banner.textContent=s.paused?'VOTING PAUSED':'CHAT: VOTE · '+s.seconds+'s';
 }
 async function poll(){try{const r=await fetch(STATE_URL,{cache:'no-store',signal:AbortSignal.timeout(1800)});if(!r.ok)throw Error();const s=await r.json();lastSuccess=Date.now();render(s)}catch{}setTimeout(poll,250)}
 setInterval(()=>{if(Date.now()-lastSuccess>2500)root.style.opacity='0'},300);poll();

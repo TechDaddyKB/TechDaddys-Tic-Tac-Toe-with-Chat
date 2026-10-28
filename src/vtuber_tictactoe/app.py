@@ -77,7 +77,7 @@ class Settings:
         packaged_id = (
             files("vtuber_tictactoe").joinpath("assets", "twitch-client-id.txt").read_text().strip()
         )
-        if not settings.client_id and packaged_id:
+        if packaged_id:
             settings.client_id = packaged_id
         return settings
 
@@ -167,6 +167,7 @@ class Application:
         self.connected = False
         self.login = ""
         self.chat_status = "Disconnected"
+        self.chat_messages_received = 0
         self.overlay_seen = 0.0
         self.twitch = Twitch(self.on_vote, self.on_status)
 
@@ -181,6 +182,7 @@ class Application:
     def on_vote(self, user: str, text: str, sent_at: float | None) -> None:
         with self.lock:
             if self.connected and not self.practice:
+                self.chat_messages_received += 1
                 self.game.vote(user, text, time.monotonic(), sent_at)
 
     def on_status(self, status: str, login: str, connected: bool) -> None:
@@ -216,7 +218,7 @@ class Application:
                 "connected": self.connected,
                 "chat_status": self.chat_status,
                 "login": self.login,
-                "client_id": self.settings.client_id,
+                "chat_messages_received": self.chat_messages_received,
                 "channel": self.settings.channel,
                 "overlay_path": self.settings.overlay_path,
                 "overlay_connected": now - self.overlay_seen < 3,
@@ -226,14 +228,18 @@ class Application:
 
     def require_chat(self) -> None:
         if not self.practice and not self.connected:
-            raise ValueError("Connect Twitch first, or enable Practice mode.")
+            raise ValueError("Connect Twitch first, or enable Test mode.")
 
     def action(self, action: str, data: dict[str, object]) -> dict[str, object]:
         # Blocking network requests and native dialogs must not hold the game lock.
         if action == "connect":
             if self.practice:
-                raise ValueError("Turn off Practice mode before connecting Twitch.")
-            client_id = str(data.get("client_id", "")).strip()
+                raise ValueError("Turn off Test mode before connecting Twitch.")
+            client_id = self.settings.client_id
+            if not client_id:
+                raise ValueError(
+                    "This build is missing its Twitch app configuration. Use the official release."
+                )
             channel = normalize_channel(str(data.get("channel", "")), allow_empty=True)
             with self.lock:
                 if self.game.phase not in ("ready", "over") and channel != self.settings.channel:
@@ -308,20 +314,26 @@ class Application:
                 if self.connected or (
                     self.twitch.thread is not None and self.twitch.thread.is_alive()
                 ):
-                    raise ValueError("Disconnect Twitch before switching Practice mode.")
+                    raise ValueError("Disconnect Twitch before switching Test mode.")
                 if self.game.phase not in ("ready", "over"):
-                    raise ValueError("Reset this game before switching Practice mode.")
+                    raise ValueError("Reset this game before switching Test mode.")
                 self.practice = not self.practice
                 self.game.reset()
             elif action == "test_vote":
                 if not self.practice:
-                    raise ValueError("Test votes are only available in Practice mode.")
+                    raise ValueError("Test votes are only available in Test mode.")
                 if not self.game.vote(
                     str(data.get("user", "demo")), str(data.get("text", "")), now
                 ):
                     raise ValueError(
                         "Vote ignored: voting is closed, paused, or that square is occupied."
                     )
+            elif action == "finish_test_vote":
+                if not self.practice:
+                    raise ValueError("Only Test mode can finish voting early.")
+                if self.game.phase != "chat" or self.game.paused:
+                    raise ValueError("Start or resume a test chat vote first.")
+                self.game.tick(self.game.deadline)
             elif action == "quit":
                 self.stopping.set()
             else:

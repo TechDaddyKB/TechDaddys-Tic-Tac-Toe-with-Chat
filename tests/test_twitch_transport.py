@@ -1,6 +1,10 @@
+import time
+from pathlib import Path
+
 import pytest
 
 from vtuber_tictactoe import twitch
+from vtuber_tictactoe.app import Application, Settings
 from vtuber_tictactoe.twitch import Twitch, TwitchError
 
 
@@ -142,3 +146,30 @@ def test_stop_shuts_down_socket_and_signals_cancel() -> None:
     reader.stop()
     assert stream.closed and reader.cancel.is_set()
     assert statuses[-1] == ("Disconnected", "", False)
+
+
+def test_offline_room_broadcaster_messages_reach_game_and_deduplicate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = Application(Settings(tmp_path / "settings.json"))
+    app.game.start("chat", time.monotonic(), 1000)
+    message = (
+        b"@badges=broadcaster/1;room-id=42;user-id=42;tmi-sent-ts=1234000 "
+        b":stream!stream@host PRIVMSG #stream :1\r\n"
+    )
+    stream = FakeStream(
+        [
+            b"@room-id=42;emote-only=0 :tmi.twitch.tv ROOMSTATE #stream\r\n",
+            message,
+            message,
+            b":tmi.twitch.tv NOTICE * :Login authentication failed\r\n",
+        ]
+    )
+    setup_transport(monkeypatch, app.twitch, stream)
+    app.twitch.listen("client", "stream", {"access_token": "test"})
+    assert app.state()["chat_messages_received"] == 2
+    assert app.state()["voters"] == 1 and app.game.tally()[0] == 1
+    app.game.resume(time.monotonic(), time.time())
+    app.game.tick(app.game.deadline)
+    assert app.game.board[0] == "O" and app.game.phase == "streamer"
