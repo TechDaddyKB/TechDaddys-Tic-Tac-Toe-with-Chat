@@ -85,7 +85,8 @@ jobs:
 
   publish:
     name: Attach executables to GitHub release
-    if: github.event_name == 'release' || (github.event_name == 'push' && github.event.head_commit.message == 'Release v0.2.0: native desktop controller')
+    if: >-
+      github.event_name == 'release' || (github.event_name == 'push' && github.event.head_commit.message == 'Release v0.2.0: native desktop controller')
     needs: [build, browser]
     runs-on: ubuntu-22.04
     permissions:
