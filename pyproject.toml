@@ -1,0 +1,57 @@
+[project]
+name = "vtuber-tictactoe"
+version = "0.1.0"
+description = "TechDaddy's Tic-Tac-Toe with Chat: a portable Twitch game and transparent VTube Studio item"
+readme = "README.md"
+authors = [
+    { name = "Tech Daddy" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "certifi>=2026.10.23",
+]
+
+[project.scripts]
+vtuber-tictactoe = "vtuber_tictactoe:main"
+
+[build-system]
+requires = ["uv_build>=0.13.4,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.40.2",
+    "playwright>=1.64.1",
+    "pyinstaller>=6.22.3",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.3",
+    "ty>=0.0.94",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM"]
+
+[tool.basedpyright]
+include = ["src"]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["vtuber_tictactoe"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 75

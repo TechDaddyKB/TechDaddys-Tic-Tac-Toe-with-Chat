@@ -1,0 +1,21 @@
+TechDaddy's Tic-Tac-Toe with Chat application: MIT (see LICENSE.txt or LICENSE).
+
+Distributions include CPython under the Python Software Foundation License.
+The included licenses/PYTHON-LICENSE.txt contains the full Python license.
+Official source: https://www.python.org/
+
+All distributions include certifi's Mozilla CA certificate bundle and Python code.
+certifi is licensed under Mozilla Public License 2.0.
+https://github.com/certifi/python-certifi
+https://www.mozilla.org/MPL/2.0/
+
+The native builds use the Python Software Foundation runtime, Tcl/Tk (Linux), OpenSSL,
+and PyInstaller's bootloader. PyInstaller is GPL 2.0 with an exception allowing
+distribution of frozen applications under their own license.
+https://pyinstaller.org/en/stable/license.html
+https://www.tcl.tk/software/tcltk/license.html
+
+Full third-party license files and distribution metadata are supplied in the
+release archive's licenses folder when available from the bundled runtime.
+Twitch and VTube Studio names are trademarks of their respective owners.
+This application is not affiliated with or endorsed by Twitch or DenchiSoft.
