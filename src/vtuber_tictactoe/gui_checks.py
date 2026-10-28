@@ -109,7 +109,10 @@ def check_desktop(window: MainWindow) -> None:
             )
             QTimer.singleShot(100, lambda: dismiss(choose=True))
             window.pick_overlay(False)
-            assert window.app.settings.overlay_path == str(path)
+            assert Path(window.app.settings.overlay_path).samefile(path), (
+                window.app.settings.overlay_path,
+                str(path),
+            )
         assert not errors, errors
     window.app.settings.overlay_path = ""
     window.app.settings.save()

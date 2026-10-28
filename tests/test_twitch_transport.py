@@ -178,8 +178,9 @@ def test_offline_room_broadcaster_messages_reach_game_and_deduplicate(
 def test_twitch_tls_rejects_obsolete_protocols() -> None:
     import ssl
 
-    from vtuber_tictactoe.twitch import TLS
+    from vtuber_tictactoe.twitch import TLS, create_tls_context
 
-    assert TLS.minimum_version >= ssl.TLSVersion.TLSv1_2
-    assert TLS.verify_mode == ssl.CERT_REQUIRED
-    assert TLS.check_hostname
+    for context in (TLS, create_tls_context()):
+        assert context.minimum_version >= ssl.TLSVersion.TLSv1_2
+        assert context.verify_mode == ssl.CERT_REQUIRED
+        assert context.check_hostname

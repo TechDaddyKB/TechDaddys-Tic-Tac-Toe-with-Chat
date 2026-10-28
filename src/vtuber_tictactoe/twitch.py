@@ -18,8 +18,16 @@ from urllib.request import Request, urlopen
 import certifi
 
 Json = dict[str, object]
-TLS = ssl.create_default_context(cafile=certifi.where())
-TLS.minimum_version = ssl.TLSVersion.TLSv1_2
+
+
+def create_tls_context() -> ssl.SSLContext:
+    """Configure a context completely before publishing it to worker threads."""
+    context = ssl.create_default_context(cafile=certifi.where())
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
+
+
+TLS = create_tls_context()
 
 
 def normalize_channel(value: str, *, allow_empty: bool = False) -> str:
