@@ -43,6 +43,7 @@ class Settings:
     port: int = 18765
     theme: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_THEME))
     visible: bool = True
+    vote_seconds: int = 30
 
     @classmethod
     def load(cls, folder: Path) -> "Settings":
@@ -67,6 +68,13 @@ class Settings:
                 settings.port = port
             if isinstance(data.get("visible"), bool):
                 settings.visible = data["visible"]
+            duration = data.get("vote_seconds")
+            if (
+                isinstance(duration, int)
+                and not isinstance(duration, bool)
+                and 1 <= duration <= 600
+            ):
+                settings.vote_seconds = duration
             if "theme" in data:
                 with contextlib.suppress(ValueError):
                     settings.theme = validate_theme(data["theme"])
@@ -90,6 +98,7 @@ class Settings:
                 "port",
                 "theme",
                 "visible",
+                "vote_seconds",
             )
         }
         temporary = self.file.with_suffix(".tmp")
@@ -102,7 +111,7 @@ class Application:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.lock = threading.RLock()
-        self.game = Game(visible=settings.visible)
+        self.game = Game(visible=settings.visible, vote_seconds=settings.vote_seconds)
         self.control_token = secrets.token_urlsafe(32)
         self.stopping = threading.Event()
         self.practice = False
@@ -212,6 +221,17 @@ class Application:
             if action == "start":
                 self.require_chat()
                 self.game.start(str(data.get("first", "random")), now, wall)
+            elif action == "vote_duration":
+                seconds = data.get("seconds")
+                if (
+                    not isinstance(seconds, int)
+                    or isinstance(seconds, bool)
+                    or not 1 <= seconds <= 600
+                ):
+                    raise ValueError("Choose a chat vote time between 1 and 600 seconds.")
+                self.settings.vote_seconds = seconds
+                self.game.vote_seconds = seconds
+                self.settings.save()
             elif action == "select":
                 cell = data.get("cell")
                 if not isinstance(cell, int) or isinstance(cell, bool):

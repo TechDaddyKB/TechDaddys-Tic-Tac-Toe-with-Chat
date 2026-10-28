@@ -1,6 +1,6 @@
 [project]
 name = "vtuber-tictactoe"
-version = "0.2.0"
+version = "0.2.1"
 description = "TechDaddy's Tic-Tac-Toe with Chat: a portable Twitch game and transparent VTube Studio item"
 readme = "README.md"
 authors = [

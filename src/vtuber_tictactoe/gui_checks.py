@@ -1,6 +1,7 @@
 """Acceptance checks shared by source and frozen native desktop builds."""
 
 import tempfile
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QEventLoop, Qt, QThread, QTimer
@@ -19,8 +20,14 @@ def check_desktop(window: MainWindow) -> None:
         "Overlay Setup",
     ]
     assert not window.app.practice
+    assert window.vote_duration.value() == 30
+    window.vote_duration.setValue(45)
     window.practice.click()
     window.chat_first.click()
+    assert 44 <= window.board.view.seconds <= 45
+    deadline = window.app.game.deadline
+    window.vote_duration.setValue(60)
+    assert window.app.game.deadline == deadline
     window.test_number.setText("1")
     window.test_cast.click()
     window.test_cast.click()
@@ -33,6 +40,8 @@ def check_desktop(window: MainWindow) -> None:
     )
     window.confirm.click()
     assert window.app.game.board[4] == "X" and window.app.game.phase == "chat"
+    assert "60 seconds" in window.confirm.text()
+    assert window.app.game.deadline - time.monotonic() > 58
     window.pause.click()
     assert window.app.game.paused
     window.resume.click()

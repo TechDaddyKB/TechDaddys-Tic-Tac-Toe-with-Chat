@@ -33,6 +33,7 @@ def main() -> None:
                     args=["--no-sandbox"],
                 )
                 errors = []
+                app.action("vote_duration", {"seconds": 75})
                 app.action("practice", {})
                 app.action("start", {"first": "streamer"})
                 app.action("select", {"cell": 5})
@@ -48,8 +49,10 @@ def main() -> None:
                 expect(overlay.locator("#voteBanner")).to_contain_text("CHAT: VOTE")
                 expect(overlay.locator("#voteBanner")).not_to_contain_text("1–9")
                 expect(overlay.locator("#voteBanner")).to_have_text(
-                    re.compile(r"CHAT: VOTE · (?:[0-9]|[12][0-9]|30)s")
+                    re.compile(r"CHAT: VOTE · [0-9]+s")
                 )
+                assert Settings.load(Path(folder)).vote_seconds == 75
+                assert int(overlay.locator("#voteBanner").inner_text().split(" · ")[1][:-1]) > 30
                 metrics = overlay.evaluate("""() => ({
                     background:getComputedStyle(document.body).backgroundColor,
                     board:document.getElementById('board').getBoundingClientRect().width,

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -93,7 +94,9 @@ class BoardWidget(QWidget):
             )
         if self.sample:
             self.view = BoardView(
-                board=["X", "", "O", "", "X", "", "", "", ""], phase="chat", seconds=30
+                board=["X", "", "O", "", "X", "", "", "", ""],
+                phase="chat",
+                seconds=app.settings.vote_seconds,
             )
         self.update()
 
@@ -306,6 +309,21 @@ class MainWindow(QMainWindow):
         board_column.addWidget(self.message)
         self.vote_summary = QLabel()
         layout.addWidget(self.vote_summary)
+        duration_row = QFormLayout()
+        self.vote_duration = QSpinBox()
+        self.vote_duration.setRange(1, 600)
+        self.vote_duration.setSuffix(" seconds")
+        self.vote_duration.setValue(self.app.settings.vote_seconds)
+        self.vote_duration.setAccessibleName("Chat vote time")
+        self.vote_duration.setToolTip("Saved automatically. Applies to the next chat turn.")
+        self.vote_duration.valueChanged.connect(
+            lambda seconds: self.invoke("vote_duration", seconds=seconds)
+        )
+        duration_row.addRow("Chat vote time", self.vote_duration)
+        layout.addLayout(duration_row)
+        duration_hint = QLabel("Applies to the next chat turn · saved automatically")
+        duration_hint.setWordWrap(True)
+        layout.addWidget(duration_hint)
         self.confirm = self.button(
             "Confirm move & give chat 30 seconds", lambda: self.invoke("confirm"), primary=True
         )
@@ -591,6 +609,12 @@ class MainWindow(QMainWindow):
             self.vote_summary.setText(
                 f"{len(game.votes)} unique vote(s) this turn · one current vote per viewer"
             )
+            duration = self.app.settings.vote_seconds
+            self.vote_duration.blockSignals(True)
+            self.vote_duration.setValue(duration)
+            self.vote_duration.blockSignals(False)
+            self.confirm.setText(f"Confirm move & give chat {duration} seconds")
+            self.retry.setText(f"Reopen voting · {duration} seconds")
             available = self.app.connected or self.app.practice
             self.start.setEnabled(available and game.phase in ("ready", "over"))
             self.confirm.setEnabled(

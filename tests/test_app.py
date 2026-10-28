@@ -192,3 +192,23 @@ def test_http_mutations_reject_csrf_and_invalid_input(server: Application) -> No
         == 400
     )
     assert request(server, "/api/action", {"action": "x" * 9000})[0] == 400
+
+
+def test_vote_duration_saved_and_legacy_settings_default_to_thirty(tmp_path: Path) -> None:
+    settings = Settings.load(tmp_path)
+    assert settings.vote_seconds == 30
+    app = Application(settings)
+    app.action("vote_duration", {"seconds": 75})
+    restored = Application(Settings.load(tmp_path))
+    assert restored.game.vote_seconds == restored.settings.vote_seconds == 75
+    settings.file.write_text('{"channel":"some_channel"}')
+    assert Settings.load(tmp_path).vote_seconds == 30
+
+
+@pytest.mark.parametrize("seconds", [0, 601, -1, True, 2.5, "45", None])
+def test_invalid_vote_duration_is_rejected(app: Application, seconds: object) -> None:
+    with pytest.raises(ValueError, match="between 1 and 600"):
+        app.action("vote_duration", {"seconds": seconds})
+    assert app.settings.vote_seconds == app.game.vote_seconds == 30
+    app.settings.file.write_text(json.dumps({"vote_seconds": seconds}))
+    assert Settings.load(app.settings.file.parent).vote_seconds == 30

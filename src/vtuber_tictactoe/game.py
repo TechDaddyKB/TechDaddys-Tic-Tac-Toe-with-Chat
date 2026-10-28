@@ -29,6 +29,7 @@ class Game:
     votes: dict[str, int] = field(default_factory=dict)
     deadline: float = 0.0
     accept_after: float = 0.0
+    vote_seconds: int = 30
     remaining: float = 30.0
     winner: str = ""
     winning_line: tuple[int, ...] = ()
@@ -44,7 +45,7 @@ class Game:
         self.votes.clear()
         self.winner = ""
         self.winning_line = ()
-        self.remaining = 30.0
+        self.remaining = float(self.vote_seconds)
         self.message = "Ready when you are. Randomize who starts."
 
     def start(self, first: str, now: float, wall: float) -> None:
@@ -66,9 +67,9 @@ class Game:
         self.phase = "chat"
         self.paused = False
         self.votes.clear()
-        self.deadline = now + 30.0
+        self.deadline = now + self.vote_seconds
         self.accept_after = wall
-        self.remaining = 30.0
+        self.remaining = float(self.vote_seconds)
         self.message = "Chat's turn! Type a free square's number (1–9)."
 
     def select(self, cell: int) -> None:
@@ -112,7 +113,7 @@ class Game:
         counts = self.tally()
         if not self.votes:
             self.phase = "no_votes"
-            self.message = "No votes received. Reopen chat voting for another 30 seconds."
+            self.message = "No votes received. Reopen chat voting to try again."
             return
         best = max(counts)
         leaders = [i for i, count in enumerate(counts) if count == best]

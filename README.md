@@ -73,19 +73,26 @@ while the board says it is chat's turn. Your channel can be offline. Your own ac
 The controller shows received chat messages and unique votes so you can see the connection working.
 Sending `1` several times from the same account counts as **one** vote for square 1.
 
+## Chat vote time
+
+In the **Game** tab, set **Chat vote time** to 1–600 seconds. It defaults to **30 seconds**
+and saves automatically between launches. Changes apply to the next chat turn, including
+reopened votes; a vote already in progress keeps its current timer. The banner counts down
+from the chosen duration. Pausing and resuming preserve the remaining time.
+
 ## Playing
 
 - **Randomize who starts** gives either side the first turn. Streamer is always X; chat is O.
 - On the streamer's turn, click an empty square in the controller. Click another to change your
-  selection. **Confirm move & give chat 30 seconds** commits it and opens chat voting.
+  selection. **Confirm move & give chat … seconds** commits it and opens chat voting.
 - Chat votes by sending exactly one number, `1` through `9`, for an empty square.
   Spaces around the digit are allowed. Messages such as `vote 5`, `!5`, or `1 2` are ignored.
 - Each viewer has one vote per chat turn. Their latest valid vote replaces their previous vote.
   Repeated messages from the same person do not add extra votes.
 - The channel owner's own messages count too, so you can test through your own offline channel.
   Messages originating from other shared-chat rooms are ignored.
-- At 30 seconds, the highest count wins. Ties are chosen randomly among tied leaders.
-- If nobody votes, no mark is placed. Use **Reopen voting** for another 30 seconds.
+- When the timer expires, the highest count wins. Ties are chosen randomly among tied leaders.
+- If nobody votes, no mark is placed. Use **Reopen voting** for another vote using the selected duration.
 - Pause preserves the current votes and remaining time. Disconnects automatically pause a chat
   turn. After reconnecting, click **Resume voting** yourself.
 - A win or draw stops play. Start a rematch or reset the game. Scores last for this controller session.
@@ -135,7 +142,7 @@ certificate verification enabled (CodeQL `py/insecure-protocol`). Existing saved
   outbound HTTPS plus IRC TLS on port 6697 are allowed. Disconnect and reconnect for a fresh login.
 - **Unexpected browser security prompt for local network access:** allow the HTML item to reach
   the local controller. No remote overlay hosting is used.
-- **Stream delay:** chat gets 30 real seconds starting when you confirm, independent of Twitch video
+- **Stream delay:** chat gets the selected number of real seconds starting when you confirm, independent of Twitch video
   latency. Low-latency streaming gives viewers more useful voting time.
 
 ## Development and reproducible builds
@@ -162,7 +169,7 @@ SHA256 checksums are uploaded alongside the ZIPs. Build tools are only needed by
 GitHub Actions runs lint, both type checkers, formatting, unit/HTTP/transport tests, browser checks,
 and native Windows/Linux builds. Publishing a GitHub release runs the pipeline for that exact tag
 and attaches both platform ZIPs only after all checks pass.
-The explicit main-branch commit `Release v0.2.0: native desktop controller` also publishes this
+The explicit main-branch commit `Release v0.2.1: configurable chat vote time` also publishes this
 release directly from CI after verifying security alert #1 is fixed; ordinary pushes do not publish. A release tag must match the version in
 `pyproject.toml` (for example, `v0.2.0`). Ordinary pushes and pull requests also run the checks/builds.
 

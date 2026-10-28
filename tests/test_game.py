@@ -164,3 +164,26 @@ def test_voter_limit_allows_existing_viewer_updates() -> None:
     game.votes = {str(i): 1 for i in range(100_000)}
     assert not game.vote("new", "2", 101)
     assert game.vote("0", "2", 101)
+
+
+def test_custom_duration_first_turn_next_turn_retry_and_pause() -> None:
+    game = Game(vote_seconds=45)
+    game.start("chat", 100, 1000)
+    assert game.deadline == 145
+    assert game.vote("viewer", "1", 144)
+    assert not game.vote("viewer", "2", 145)
+    game.tick(145)
+    assert game.board[0] == "O"
+    game.select(5)
+    game.confirm(200, 2000)
+    assert game.deadline == 245
+    game.vote_seconds = 60
+    assert game.deadline == 245
+    game.pause(210)
+    assert game.remaining == 35
+    game.resume(300, 3000)
+    assert game.deadline == 335
+    game.tick(335)
+    assert game.phase == "no_votes"
+    game.start_vote(400, 4000)
+    assert game.deadline == 460 and game.remaining == 60
