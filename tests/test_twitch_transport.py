@@ -173,3 +173,13 @@ def test_offline_room_broadcaster_messages_reach_game_and_deduplicate(
     app.game.resume(time.monotonic(), time.time())
     app.game.tick(app.game.deadline)
     assert app.game.board[0] == "O" and app.game.phase == "streamer"
+
+
+def test_twitch_tls_rejects_obsolete_protocols() -> None:
+    import ssl
+
+    from vtuber_tictactoe.twitch import TLS
+
+    assert TLS.minimum_version >= ssl.TLSVersion.TLSv1_2
+    assert TLS.verify_mode == ssl.CERT_REQUIRED
+    assert TLS.check_hostname

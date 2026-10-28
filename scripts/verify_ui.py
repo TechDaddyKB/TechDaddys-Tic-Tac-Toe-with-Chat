@@ -1,4 +1,4 @@
-"""Exercise the real controller and file:// overlay in a local Chromium browser."""
+"""Exercise the transparent file:// item against the controller’s real HTTP service."""
 
 import argparse
 import re
@@ -32,31 +32,12 @@ def main() -> None:
                     executable_path=args.chromium,
                     args=["--no-sandbox"],
                 )
-                page = browser.new_page(viewport={"width": 1280, "height": 1100})
                 errors = []
-                page.on("pageerror", lambda error: errors.append(str(error)))
-                page.goto(app.base + "/controller#" + app.control_token)
-                expect(page.locator("#board button")).to_have_count(9)
-                expect(page.locator("#clientId")).to_have_count(0)
-                page.locator("#practice").click()
-                expect(page.locator("#practiceFields")).to_be_visible()
-                expect(page.locator("#practice")).to_have_text("Test mode")
-                page.locator("#testChatFirst").click()
-                expect(page.locator("#start")).to_be_disabled()
-                page.locator("#testText").fill("1")
-                page.locator("#testVote").click()
-                expect(page.locator("#voteSummary")).to_contain_text("1 unique vote")
-                page.locator("#testVote").click()
-                expect(page.locator("#voteSummary")).to_contain_text("1 unique vote")
-                page.locator("#finishTestVote").click()
-                expect(page.locator("#board button").nth(0)).to_have_class("cell filled o")
-                page.locator("#board button").nth(4).click()
-                expect(page.locator("#board button").nth(4)).to_have_class("cell selected")
-                page.locator("#confirm").click()
-                expect(page.locator("#phase")).to_contain_text("chat")
-                page.locator("#testText").fill("2")
-                page.locator("#testVote").click()
-                expect(page.locator(".votecount")).to_have_text("1 vote")
+                app.action("practice", {})
+                app.action("start", {"first": "streamer"})
+                app.action("select", {"cell": 5})
+                app.action("confirm", {})
+                app.action("test_vote", {"user": "viewer-one", "text": "1"})
 
                 overlay = browser.new_page(viewport={"width": 900, "height": 1100})
                 overlay.on("pageerror", lambda error: errors.append(str(error)))
@@ -79,39 +60,31 @@ def main() -> None:
                 assert metrics["background"] == "rgba(0, 0, 0, 0)"
                 assert abs(metrics["board"] - metrics["banner"]) < 1
                 assert metrics["animation"] == "votePulse" and metrics["bannerVisible"] == "visible"
-                page.locator("#color-grid").evaluate(
-                    "el => {el.value='#112233';el.dispatchEvent(new Event('input',{bubbles:true}))}"
-                )
+                app.action("theme", {"theme": {**app.settings.theme, "grid": "#112233"}})
                 overlay.wait_for_function(
                     "getComputedStyle(document.querySelector('.grid path')).stroke==='rgb(17, 34, 51)'"
                 )
                 assert Settings.load(Path(folder)).theme["grid"] == "#112233"
-                preview = page.frame_locator("#themePreview")
-                expect(preview.locator("#voteBanner")).to_contain_text("CHAT: VOTE")
-
                 Path("build/qa").mkdir(parents=True, exist_ok=True)
-                page.screenshot(path="build/qa/controller.png", full_page=True)
                 overlay.screenshot(path="build/qa/overlay.png", omit_background=True)
-                page.locator("#pause").click()
+                app.action("pause", {})
                 expect(overlay.locator("#voteBanner")).to_have_text("VOTING PAUSED")
-                page.locator("#visibility").click()
+                app.action("visibility", {})
                 overlay.wait_for_function(
                     "getComputedStyle(document.getElementById('item')).opacity==='0'"
                 )
-                page.locator("#visibility").click()
+                app.action("visibility", {})
                 overlay.wait_for_function(
                     "getComputedStyle(document.getElementById('item')).opacity==='1'"
                 )
                 with app.lock:
                     app.game.resume(time.monotonic(), time.time())
-                page.locator("#finishTestVote").click()
+                app.action("finish_test_vote", {})
                 overlay.wait_for_function(
                     "getComputedStyle(document.getElementById('voteBanner')).visibility==='hidden'"
                 )
-                assert app.game.board[1] == "O"
+                assert app.game.board[0] == "O"
 
-                page.set_viewport_size({"width": 390, "height": 844})
-                assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                 server.shutdown()
                 overlay.wait_for_function(
                     "getComputedStyle(document.getElementById('item')).opacity==='0'", timeout=6000
@@ -119,7 +92,7 @@ def main() -> None:
                 assert not errors, errors
                 browser.close()
                 print(
-                    "UI verified: moves, chat votes, transparent file overlay, equal-width pulsing banner, saved live colors, pause/hide, mobile layout, and fail-closed visibility."
+                    "UI verified: moves, chat votes, transparent file overlay, equal-width pulsing banner, saved live colors, pause/hide and fail-closed visibility."
                 )
         finally:
             server.shutdown()

@@ -125,21 +125,6 @@ def test_connect_saves_only_public_settings(
         app.action("practice", {})
 
 
-def test_native_dialog_request_is_marshaled_to_main_thread(
-    app: Application, tmp_path: Path
-) -> None:
-    output = []
-    worker = threading.Thread(target=lambda: output.append(app.action("install", {})))
-    worker.start()
-    request = app.dialogs.get(timeout=2)
-    assert request.save
-    request.result = str(tmp_path / "board.html")
-    app.write_overlay(Path(request.result), existing=False)
-    request.done.set()
-    worker.join(2)
-    assert output == [{"path": request.result}]
-
-
 @pytest.fixture
 def server(app: Application):
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(app))

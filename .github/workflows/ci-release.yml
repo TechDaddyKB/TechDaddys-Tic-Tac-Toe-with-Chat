@@ -48,8 +48,21 @@ jobs:
       - run: uv sync --locked
       - name: Run platform tests
         run: uv run pytest
-      - name: Build, smoke-test, and package
+      - name: Install Linux desktop test dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 libegl1 libopengl0
+      - name: Build and test Linux executable with real Qt file dialogs
+        if: runner.os == 'Linux'
+        run: xvfb-run -a uv run python scripts/build_native.py
+      - name: Build and test Windows GUI executable
+        if: runner.os == 'Windows'
         run: uv run python scripts/build_native.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: native-gui-check-${{ matrix.target }}
+          path: build/qa/*
+          retention-days: 14
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-${{ matrix.target }}
@@ -58,7 +71,7 @@ jobs:
           retention-days: 14
 
   browser:
-    name: Transparent item and controller browser checks
+    name: Transparent item browser checks
     needs: quality
     runs-on: ubuntu-22.04
     steps:

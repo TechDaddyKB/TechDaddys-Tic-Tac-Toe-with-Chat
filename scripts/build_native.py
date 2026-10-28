@@ -13,6 +13,7 @@ import time
 import tomllib
 import zipfile
 from importlib.metadata import distribution
+from importlib.metadata import version as package_version
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -28,7 +29,7 @@ def smoke_test(executable: Path) -> None:
             probe.bind(("127.0.0.1", 0))
             port = probe.getsockname()[1]
         process = subprocess.Popen(
-            [str(executable), "--no-browser", "--port", str(port), "--config-dir", folder],
+            [str(executable), "--no-gui", "--port", str(port), "--config-dir", folder],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -60,9 +61,51 @@ def smoke_test(executable: Path) -> None:
                 process.wait(timeout=5)
 
 
+def audit_runtime(bundle: Path) -> None:
+    files = [file.name.lower() for file in bundle.rglob("*") if file.is_file()]
+    forbidden = [name for name in files if name.startswith(("_tkinter", "libtk", "libtcl"))]
+    if forbidden:
+        raise RuntimeError(f"Tk runtime unexpectedly included: {forbidden}")
+    if not any("qt6widgets" in name for name in files):
+        raise RuntimeError("Native Qt widgets runtime was not bundled.")
+    if sys.platform == "linux":
+        runtime = next(bundle.rglob("libpython3.12.so.1.0"))
+        symbols = subprocess.check_output(["nm", "-D", "--defined-only", str(runtime)], text=True)
+        if any(symbol in symbols for symbol in ("Tk_MenuObjCmd", "XOpenDisplay", "_XSend")):
+            raise RuntimeError("Python runtime embeds the legacy Tk/Xlib implementation.")
+    print("Runtime audit passed: Qt included; Tk absent.")
+
+
+def gui_smoke_test(executable: Path) -> None:
+    with tempfile.TemporaryDirectory() as folder:
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        result = subprocess.run(
+            [str(executable), "--gui-self-test", "--config-dir", folder, "--port", str(port)],
+            capture_output=True,
+            text=True,
+            timeout=90,
+        )
+        qa = ROOT / "build" / "qa"
+        qa.mkdir(parents=True, exist_ok=True)
+        (qa / "native-gui.log").write_text(result.stdout + result.stderr, encoding="utf-8")
+        report = Path(folder) / "gui-self-test.json"
+        if result.returncode or not report.exists():
+            raise RuntimeError("Frozen GUI check failed: " + result.stdout + result.stderr)
+        content = json.loads(report.read_text())
+        if content.get("gui_self_test") != "passed":
+            raise RuntimeError(f"Frozen GUI check failed: {content}")
+        shutil.copy2(report, qa / report.name)
+        shutil.copy2(Path(folder) / "desktop-preview.png", qa / "desktop-preview.png")
+        print("Frozen GUI passed: moves, votes, tabs, menus and file pickers.")
+
+
 def collect_licenses(destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
-    for package in ("certifi", "pyinstaller"):
+    for file in (ROOT / "licenses").glob("*.txt"):
+        shutil.copy2(file, destination / file.name)
+    for package in ("certifi", "pyinstaller", "PySide6-Essentials", "shiboken6"):
         dist = distribution(package)
         for file in dist.files or []:
             if (
@@ -97,7 +140,7 @@ def main() -> None:
         "PyInstaller",
         "--noconfirm",
         "--clean",
-        "--onefile",
+        "--onedir",
         "--name",
         NAME,
         "--collect-data",
@@ -107,15 +150,17 @@ def main() -> None:
     ]
     if sys.platform == "win32":
         command.append("--windowed")
-    else:
-        command.extend(["--hidden-import", "tkinter", "--hidden-import", "tkinter.filedialog"])
+    command.extend(["--exclude-module", "tkinter", "--exclude-module", "_tkinter"])
     command.append(str(ROOT / "scripts/launch.py"))
     subprocess.run(command, cwd=ROOT, check=True)
-    executable = ROOT / "dist" / (NAME + (".exe" if sys.platform == "win32" else ""))
+    bundle = ROOT / "dist" / NAME
+    executable = bundle / (NAME + (".exe" if sys.platform == "win32" else ""))
+    audit_runtime(bundle)
     smoke_test(executable)
+    gui_smoke_test(executable)
     stage = ROOT / "build" / f"{NAME}-{target}"
     stage.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(executable, stage / executable.name)
+    shutil.copytree(bundle, stage, dirs_exist_ok=True)
     for source, name in [
         ("README.md", "START-HERE.txt"),
         ("LICENSE", "LICENSE.txt"),
@@ -130,10 +175,14 @@ def main() -> None:
                 "version": version,
                 "target": target,
                 "python": platform.python_version(),
+                "pyside6": package_version("PySide6-Essentials"),
+                "shiboken6": package_version("shiboken6"),
                 "platform": platform.platform(),
                 "commit": os.environ.get("GITHUB_SHA", "local"),
                 "self_test": "passed",
                 "http_smoke_test": "passed",
+                "native_gui_test": "passed",
+                "tk_free_runtime_audit": "passed",
             },
             indent=2,
         )

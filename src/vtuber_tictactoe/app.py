@@ -4,13 +4,10 @@ import argparse
 import contextlib
 import json
 import os
-import queue
 import secrets
-import subprocess
 import sys
 import threading
 import time
-import webbrowser
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -101,60 +98,6 @@ class Settings:
         temporary.replace(self.file)
 
 
-@dataclass
-class DialogRequest:
-    save: bool
-    done: threading.Event = field(default_factory=threading.Event)
-    result: str = ""
-    error: str = ""
-
-
-def native_dialog(save: bool) -> str:
-    if sys.platform == "win32":
-        kind = "SaveFileDialog" if save else "OpenFileDialog"
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms; "
-            f"$dialog = New-Object System.Windows.Forms.{kind}; "
-            "$dialog.Filter='HTML overlay (*.html)|*.html'; "
-            "$dialog.FileName='tic-tac-toe.html'; "
-            "$dialog.Title='Choose the TechDaddy Tic-Tac-Toe HTML item'; "
-            "if ($dialog.ShowDialog() -eq 'OK') { "
-            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-            "[Console]::Write($dialog.FileName) }"
-        )
-        result = subprocess.run(
-            ["powershell.exe", "-NoProfile", "-STA", "-Command", script],
-            capture_output=True,
-            check=True,
-            creationflags=0x08000000,
-        )
-        return result.stdout.decode("utf-8-sig").strip()
-    import tkinter as tk
-    from tkinter import filedialog
-
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-    try:
-        if save:
-            return str(
-                filedialog.asksaveasfilename(
-                    title="Choose the TechDaddy Tic-Tac-Toe HTML item",
-                    filetypes=[("HTML overlay", "*.html")],
-                    defaultextension=".html",
-                    initialfile="tic-tac-toe.html",
-                )
-            )
-        return str(
-            filedialog.askopenfilename(
-                title="Choose the TechDaddy Tic-Tac-Toe HTML item",
-                filetypes=[("HTML overlay", "*.html")],
-            )
-        )
-    finally:
-        root.destroy()
-
-
 class Application:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -162,7 +105,6 @@ class Application:
         self.game = Game(visible=settings.visible)
         self.control_token = secrets.token_urlsafe(32)
         self.stopping = threading.Event()
-        self.dialogs: queue.Queue[DialogRequest] = queue.Queue()
         self.practice = False
         self.connected = False
         self.login = ""
@@ -264,14 +206,6 @@ class Application:
         if action == "disconnect":
             self.twitch.stop()
             return {}
-        if action in ("install", "browse"):
-            request = DialogRequest(save=action == "install")
-            self.dialogs.put(request)
-            if not request.done.wait(300):
-                raise ValueError("File dialog timed out. Try again.")
-            if request.error:
-                raise ValueError(request.error)
-            return {"path": request.result}
         with self.lock:
             now, wall = time.monotonic(), time.time()
             self.game.tick(now)
@@ -391,7 +325,7 @@ def make_handler(app: Application) -> type[BaseHTTPRequestHandler]:
             if not self.local_host():
                 self.reply(403, {"error": "Use the controller's local address."})
             elif path == "/" or path == "/controller":
-                self.reply(200, asset("controller.html"), html=True)
+                self.reply(200, {"application": "TechDaddy Tic-Tac-Toe", "controller": "desktop"})
             elif path == urlsplit(app.overlay_url).path:
                 self.reply(
                     200,
@@ -446,7 +380,11 @@ def make_handler(app: Application) -> type[BaseHTTPRequestHandler]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="TechDaddy's Tic-Tac-Toe with Chat")
     parser.add_argument(
-        "--no-browser", action="store_true", help="Do not open the controller automatically"
+        "--no-gui",
+        "--no-browser",
+        dest="no_gui",
+        action="store_true",
+        help="Run only the local overlay service for diagnostics",
     )
     parser.add_argument("--config-dir", type=Path, default=default_config_dir())
     parser.add_argument("--port", type=int)
@@ -454,6 +392,11 @@ def main() -> None:
         "--self-test",
         action="store_true",
         help="Check embedded resources and game rules, then exit",
+    )
+    parser.add_argument(
+        "--gui-self-test",
+        action="store_true",
+        help="Exercise the native desktop and file dialogs, then exit",
     )
     args = parser.parse_args()
     if args.self_test:
@@ -464,7 +407,7 @@ def main() -> None:
         assert game.vote("viewer", "1", 2)
         game.tick(31)
         assert game.board[0] == "O" and game.board[4] == "X"
-        assert MARKER in asset("overlay.html") and "TechDaddy" in asset("controller.html")
+        assert MARKER in asset("overlay.html")
         print("TechDaddy Tic-Tac-Toe self-test passed.")
         return
     settings = Settings.load(args.config_dir)
@@ -490,38 +433,28 @@ def main() -> None:
             )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    url = app.base + "/controller#" + app.control_token
-    if not args.no_browser:
-        webbrowser.open(url)
-    if sys.stdout is not None:
-        print(
-            "TechDaddy Tic-Tac-Toe is running. Use Quit controller in its browser tab to exit.",
-            flush=True,
-        )
-        if args.no_browser:
-            print(url, flush=True)
-    try:
+
+    def tick_game() -> None:
         while not app.stopping.wait(0.1):
             with app.lock:
                 app.game.tick(time.monotonic())
-            try:
-                request = app.dialogs.get_nowait()
-            except queue.Empty:
-                continue
-            try:
-                request.result = native_dialog(request.save)
-                if request.result:
-                    with app.lock:
-                        app.write_overlay(Path(request.result), existing=not request.save)
-            except Exception:
-                request.error = (
-                    "Could not save or locate the overlay. Choose a writable HTML item path."
-                )
-            finally:
-                request.done.set()
+
+    ticker = threading.Thread(target=tick_game, daemon=True)
+    ticker.start()
+    try:
+        if args.no_gui:
+            if sys.stdout is not None:
+                print(app.base + "/controller#" + app.control_token, flush=True)
+            while not app.stopping.wait(0.2):
+                pass
+        else:
+            from .gui import run_desktop
+
+            run_desktop(app, self_test=args.gui_self_test)
     except KeyboardInterrupt:
         pass
     finally:
+        app.stopping.set()
         app.twitch.stop()
         server.shutdown()
         server.server_close()
