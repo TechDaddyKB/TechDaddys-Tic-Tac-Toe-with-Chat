@@ -187,3 +187,117 @@ def test_custom_duration_first_turn_next_turn_retry_and_pause() -> None:
     assert game.phase == "no_votes"
     game.start_vote(400, 4000)
     assert game.deadline == 460 and game.remaining == 60
+
+
+def test_concede_votes_share_one_choice_and_replace_number_votes() -> None:
+    game = chat_game()
+    assert game.vote("a", "1", 101)
+    assert game.vote("a", " GIVE   UP ", 102)
+    assert game.vote("b", "rigged", 102)
+    assert game.tally() == [0] * 9 and game.concession_votes() == 2
+    assert game.vote("a", "2", 103)
+    assert game.concession_votes() == 1 and game.tally()[1] == 1
+    assert game.vote("c", "concede", 104)
+    game.tick(130)
+    assert game.winner == "X" and game.conceded_by == "O"
+    assert not any(game.board) and game.scores["X"] == 1
+    game.tick(131)
+    assert game.scores["X"] == 1
+    game.reset()
+    assert game.conceded_by == ""
+
+
+def test_concede_requires_exact_phrase_and_respects_turn_pause_and_time() -> None:
+    game = chat_game()
+    assert not game.vote("v", "this is rigged", 101)
+    assert not game.vote("", "rigged", 101)
+    assert not game.vote("v", "rigged", 101, 999)
+    game.pause(102)
+    assert not game.vote("v", "rigged", 103)
+    game.resume(104, 1004)
+    assert not game.vote("v", "rigged", game.deadline)
+    game.concede("O")
+    assert not game.vote("v", "rigged", 105)
+
+
+def test_streamer_concession_and_wrong_turns() -> None:
+    game = Game()
+    for side in ("X", "O", "bad"):
+        with pytest.raises(ValueError):
+            game.concede(side)
+    game.start("streamer", 0, 0)
+    game.select(5)
+    with pytest.raises(ValueError):
+        game.concede("O")
+    game.concede("X")
+    assert game.winner == "O" and game.pending is None and game.scores["O"] == 1
+    with pytest.raises(ValueError):
+        game.concede("X")
+
+
+def test_phrase_changes_apply_next_chat_turn_and_can_disable_concessions() -> None:
+    game = chat_game()
+    game.concede_phrases = ("we surrender",)
+    assert not game.vote("v", "we surrender", 101)
+    game.start_vote(200, 2000)
+    assert game.vote("v", "WE SURRENDER", 201)
+    assert not game.vote("v", "rigged", 201)
+    game.concede_phrases = ()
+    game.start_vote(300, 3000)
+    assert not game.vote("v", "we surrender", 301)
+    assert game.vote("v", "1", 301)
+
+
+def test_concession_and_square_tie_use_normal_random_tiebreak() -> None:
+    class PickConcede:
+        def choice(self, choices):
+            assert choices == [0, 9]
+            return 9
+
+    game = chat_game()
+    game.rng = PickConcede()  # type: ignore[assignment]
+    game.vote("a", "1", 101)
+    game.vote("b", "rigged", 101)
+    game.tick(130)
+    assert game.conceded_by == "O"
+
+
+def test_streamer_last_square_auto_fills_but_chat_last_square_can_concede() -> None:
+    game = chat_game()
+    game.board = ["X", "O", "X", "X", "O", "O", "O", "", ""]
+    game.vote("v", "9", 101)
+    game.tick(130)
+    assert game.board[7] == "X" and game.winner == "draw"
+    assert "automatically" in game.message
+
+    game = Game()
+    game.phase = "streamer"
+    game.board = ["X", "O", "X", "X", "O", "O", "O", "", ""]
+    game.select(8)
+    game.confirm(0, 1000)
+    assert game.phase == "chat" and not game.board[8]
+    game.vote("a", "give up", 1)
+    game.tick(30)
+    assert game.winner == "X" and not game.board[8]
+
+
+def test_chat_last_square_can_still_vote_for_a_draw() -> None:
+    game = chat_game()
+    game.board = ["X", "O", "X", "X", "O", "O", "O", "X", ""]
+    game.vote("v", "9", 101)
+    game.tick(130)
+    assert game.board[8] == "O" and game.winner == "draw"
+
+
+def test_automatic_streamer_last_move_can_win_and_never_overrides_chat_win() -> None:
+    game = chat_game()
+    game.board = ["X", "O", "O", "O", "X", "X", "X", "", ""]
+    game.vote("v", "8", 101)
+    game.tick(130)
+    assert game.board[8] == "X" and game.winner == "X"
+    assert game.winning_line == (0, 4, 8) and game.scores["X"] == 1
+    game = chat_game()
+    game.board = ["X", "O", "X", "X", "O", "", "O", "", "X"]
+    game.vote("v", "8", 101)
+    game.tick(130)
+    assert game.winner == "O" and game.board[5] == ""

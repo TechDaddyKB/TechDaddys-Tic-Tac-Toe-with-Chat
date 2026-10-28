@@ -7,7 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QEventLoop, Qt, QThread, QTimer
 from PySide6.QtGui import QColor, QCursor
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QColorDialog, QFileDialog, QLineEdit, QMenu
+from PySide6.QtWidgets import QApplication, QColorDialog, QFileDialog, QLineEdit, QMenu, QMessageBox
 
 from .gui import MainWindow
 
@@ -18,6 +18,7 @@ def check_desktop(window: MainWindow) -> None:
         "Twitch",
         "Appearance",
         "Overlay Setup",
+        "Practice",
     ]
     assert not window.app.practice
     assert window.vote_duration.value() == 30
@@ -51,6 +52,39 @@ def check_desktop(window: MainWindow) -> None:
     assert window.app.game.visible != original
     window.visibility.click()
     assert window.app.game.visible == original
+    assert not window.concede_button.isEnabled()
+    window.phrase_editor.setPlainText("concede\ngive up\nrigged\nwe surrender")
+    window.save_concede_phrases()
+    window.app.action("reset", {})
+    window.app.action("start", {"first": "chat"})
+    window.refresh()
+    window.test_number.setText("we surrender")
+    window.test_cast.click()
+    assert window.app.game.concession_votes() == 1
+    window.finish_vote.click()
+    assert window.app.game.conceded_by == "O"
+    window.app.action("reset", {})
+    window.streamer_first.click()
+    assert window.concede_button.isEnabled()
+
+    def accept_concession() -> None:
+        dialog = QApplication.activeModalWidget()
+        assert isinstance(dialog, QMessageBox)
+        button = dialog.button(QMessageBox.StandardButton.Yes)
+        assert button is not None
+        button.click()
+
+    QTimer.singleShot(100, accept_concession)
+    window.concede_button.click()
+    assert window.app.game.conceded_by == "X" and not window.concede_button.isEnabled()
+    window.app.action("reset", {})
+    window.app.action("start", {"first": "chat"})
+    window.app.action("test_vote", {"user": "demo", "text": "1"})
+    window.app.action("finish_test_vote", {})
+    window.app.action("select", {"cell": 5})
+    window.app.action("confirm", {})
+    window.refresh()
+    assert "TEST" not in window.turn.text()
     old_theme = dict(window.app.settings.theme)
 
     def color_picker() -> None:
@@ -125,6 +159,12 @@ def check_desktop(window: MainWindow) -> None:
         assert not errors, errors
     window.app.settings.overlay_path = ""
     window.app.settings.save()
+    for index, name in enumerate(("game", "twitch", "appearance", "overlay", "practice")):
+        window.tabs.setCurrentIndex(index)
+        QApplication.processEvents()
+        assert window.grab().save(
+            str(window.app.settings.file.parent / f"documentation-{name}.png")
+        )
     window.tabs.setCurrentIndex(0)
     QApplication.processEvents()
     if not window.grab().save(str(window.app.settings.file.parent / "desktop-preview.png")):

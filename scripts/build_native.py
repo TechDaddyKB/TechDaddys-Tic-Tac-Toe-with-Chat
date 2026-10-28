@@ -159,6 +159,8 @@ def main() -> None:
     smoke_test(executable)
     gui_smoke_test(executable)
     stage = ROOT / "build" / f"{NAME}-{target}"
+    if stage.exists():
+        shutil.rmtree(stage)
     stage.mkdir(parents=True, exist_ok=True)
     shutil.copytree(bundle, stage, dirs_exist_ok=True)
     for source, name in [
@@ -168,6 +170,8 @@ def main() -> None:
     ]:
         shutil.copy2(ROOT / source, stage / name)
     shutil.copy2(ROOT / "src/vtuber_tictactoe/assets/overlay.html", stage / "tic-tac-toe.html")
+    shutil.copytree(ROOT / "docs", stage / "docs", dirs_exist_ok=True)
+    shutil.copy2(ROOT / "README.md", stage / "README.md")
     collect_licenses(stage / "licenses")
     (stage / "BUILD-INFO.json").write_text(
         json.dumps(

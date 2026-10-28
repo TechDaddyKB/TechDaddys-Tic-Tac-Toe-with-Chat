@@ -1,5 +1,9 @@
-Set **Chat vote time** directly in the Game tab. The default is **30 seconds**, with a range of **1–600 seconds**. Your choice saves automatically between launches.
+Version **1.0** adds streamer and chat concessions, a cleaner Game screen, and an illustrated getting-started guide.
 
-The duration applies to the next chat turn, including reopened votes. Changing it during voting preserves the current timer. The overlay banner uses the selected countdown, and pause/resume keeps the remaining time.
+- **Concede round** is enabled only on the streamer’s turn and asks for confirmation.
+- Chat can vote to concede with `concede`, `give up`, `rigged`, or your own saved phrases. All phrases share one tally; one current vote per viewer. Ties are random, including concession ties.
+- The streamer’s last empty square fills automatically. Chat’s final-square turn stays open so viewers can play or concede.
+- Practice controls have moved to their own **Practice** tab. The Game screen has no TEST MODE wording.
+- The README now walks through downloading, Twitch login, VTube Studio setup, playing, concessions, colors, and troubleshooting with actual controller screenshots. A copy of the guide and screenshots is included in each download.
 
-Extract the entire platform ZIP and keep the executable beside its `_internal` folder. Existing settings carry over; settings created before this update default to 30 seconds.
+Download the ZIP for your platform, extract the **entire folder**, and keep the executable beside `_internal`. Existing settings carry over. Chat vote time still defaults to 30 seconds and remains adjustable.

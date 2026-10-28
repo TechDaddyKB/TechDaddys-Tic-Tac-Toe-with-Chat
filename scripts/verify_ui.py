@@ -88,6 +88,12 @@ def main() -> None:
                 )
                 assert app.game.board[0] == "O"
 
+                app.action("reset", {})
+                app.action("start", {"first": "chat"})
+                app.action("test_vote", {"user": "viewer-one", "text": "rigged"})
+                app.action("finish_test_vote", {})
+                expect(overlay.locator("#status")).to_have_text("CHAT CONCEDED")
+                assert app.game.winner == "X" and app.game.concession_votes() == 1
                 server.shutdown()
                 overlay.wait_for_function(
                     "getComputedStyle(document.getElementById('item')).opacity==='0'", timeout=6000

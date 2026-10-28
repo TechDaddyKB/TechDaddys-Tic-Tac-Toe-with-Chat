@@ -14,7 +14,7 @@ from importlib.resources import files
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from .game import Game
+from .game import DEFAULT_CONCEDE_PHRASES, Game, validate_concede_phrases
 from .theme import DEFAULT_THEME, validate_theme
 from .twitch import Twitch, TwitchError, normalize_channel
 
@@ -44,6 +44,7 @@ class Settings:
     theme: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_THEME))
     visible: bool = True
     vote_seconds: int = 30
+    concede_phrases: tuple[str, ...] = DEFAULT_CONCEDE_PHRASES
 
     @classmethod
     def load(cls, folder: Path) -> "Settings":
@@ -75,6 +76,9 @@ class Settings:
                 and 1 <= duration <= 600
             ):
                 settings.vote_seconds = duration
+            if "concede_phrases" in data:
+                with contextlib.suppress(ValueError):
+                    settings.concede_phrases = validate_concede_phrases(data["concede_phrases"])
             if "theme" in data:
                 with contextlib.suppress(ValueError):
                     settings.theme = validate_theme(data["theme"])
@@ -99,6 +103,7 @@ class Settings:
                 "theme",
                 "visible",
                 "vote_seconds",
+                "concede_phrases",
             )
         }
         temporary = self.file.with_suffix(".tmp")
@@ -111,7 +116,11 @@ class Application:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.lock = threading.RLock()
-        self.game = Game(visible=settings.visible, vote_seconds=settings.vote_seconds)
+        self.game = Game(
+            visible=settings.visible,
+            vote_seconds=settings.vote_seconds,
+            concede_phrases=settings.concede_phrases,
+        )
         self.control_token = secrets.token_urlsafe(32)
         self.stopping = threading.Event()
         self.practice = False
@@ -179,13 +188,13 @@ class Application:
 
     def require_chat(self) -> None:
         if not self.practice and not self.connected:
-            raise ValueError("Connect Twitch first, or enable Test mode.")
+            raise ValueError("Connect Twitch first, or enable Practice mode.")
 
     def action(self, action: str, data: dict[str, object]) -> dict[str, object]:
         # Blocking network requests and native dialogs must not hold the game lock.
         if action == "connect":
             if self.practice:
-                raise ValueError("Turn off Test mode before connecting Twitch.")
+                raise ValueError("Turn off Practice mode before connecting Twitch.")
             client_id = self.settings.client_id
             if not client_id:
                 raise ValueError(
@@ -232,6 +241,13 @@ class Application:
                 self.settings.vote_seconds = seconds
                 self.game.vote_seconds = seconds
                 self.settings.save()
+            elif action == "concede_phrases":
+                phrases = validate_concede_phrases(data.get("phrases"))
+                self.settings.concede_phrases = phrases
+                self.game.concede_phrases = phrases
+                self.settings.save()
+            elif action == "concede":
+                self.game.concede("X")
             elif action == "select":
                 cell = data.get("cell")
                 if not isinstance(cell, int) or isinstance(cell, bool):
@@ -268,14 +284,14 @@ class Application:
                 if self.connected or (
                     self.twitch.thread is not None and self.twitch.thread.is_alive()
                 ):
-                    raise ValueError("Disconnect Twitch before switching Test mode.")
+                    raise ValueError("Disconnect Twitch before switching Practice mode.")
                 if self.game.phase not in ("ready", "over"):
-                    raise ValueError("Reset this game before switching Test mode.")
+                    raise ValueError("Reset this game before switching Practice mode.")
                 self.practice = not self.practice
                 self.game.reset()
             elif action == "test_vote":
                 if not self.practice:
-                    raise ValueError("Test votes are only available in Test mode.")
+                    raise ValueError("Practice votes are only available in Practice mode.")
                 if not self.game.vote(
                     str(data.get("user", "demo")), str(data.get("text", "")), now
                 ):
@@ -284,9 +300,9 @@ class Application:
                     )
             elif action == "finish_test_vote":
                 if not self.practice:
-                    raise ValueError("Only Test mode can finish voting early.")
+                    raise ValueError("Only Practice mode can finish voting early.")
                 if self.game.phase != "chat" or self.game.paused:
-                    raise ValueError("Start or resume a test chat vote first.")
+                    raise ValueError("Start or resume a practice chat vote first.")
                 self.game.tick(self.game.deadline)
             elif action == "quit":
                 self.stopping.set()

@@ -22,7 +22,7 @@ def test_early_finish_is_impossible_during_real_twitch_play(tmp_path: Path) -> N
     app = Application(Settings(tmp_path / "settings.json"))
     app.connected = True
     app.action("start", {"first": "chat"})
-    with pytest.raises(ValueError, match="Only Test mode"):
+    with pytest.raises(ValueError, match="Only Practice mode"):
         app.action("finish_test_vote", {})
     assert app.game.board == [""] * 9 and app.game.phase == "chat"
 

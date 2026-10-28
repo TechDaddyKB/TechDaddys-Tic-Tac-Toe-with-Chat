@@ -21,7 +21,9 @@ from PySide6.QtWidgets import (
     QListWidget,
     QMainWindow,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
     QVBoxLayout,
@@ -44,7 +46,7 @@ QPushButton:hover { background:#3c334b; border-color:#ccb3ef; }
 QPushButton:disabled { color:#77727f; border-color:#302d37; background:#211f27; }
 QPushButton#primary { background:#c6a6eb; color:#22182f; font-weight:700; }
 QPushButton#primary:disabled { background:#554862; color:#a09aa7; }
-QLineEdit,QListWidget { padding:10px; background:#101016; border:1px solid #393440; border-radius:7px; }
+QLineEdit,QListWidget,QPlainTextEdit,QSpinBox { padding:10px; background:#101016; border:1px solid #393440; border-radius:7px; }
 QGroupBox { border:1px solid #393440; border-radius:8px; margin-top:12px; padding-top:15px; }
 QGroupBox::title { subcontrol-origin:margin; left:12px; padding:0 7px; color:#c8aff0; }
 QCheckBox { spacing:9px; padding:7px 0; }
@@ -235,6 +237,7 @@ class MainWindow(QMainWindow):
         self.build_twitch()
         self.build_appearance()
         self.build_overlay()
+        self.build_practice()
         self.setCentralWidget(central)
         self.statusBar().showMessage("Ready · X = streamer · O = chat")
         self.timer = QTimer(self)
@@ -295,8 +298,13 @@ class MainWindow(QMainWindow):
         columns = QHBoxLayout(page)
         board_column = QVBoxLayout()
         columns.addLayout(board_column, 1)
-        layout = QVBoxLayout()
-        columns.addLayout(layout, 1)
+        controls = QWidget()
+        layout = QVBoxLayout(controls)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(controls)
+        scroll.setMinimumWidth(430)
+        columns.addWidget(scroll, 1)
         self.turn = QLabel()
         self.turn.setWordWrap(True)
         self.turn.setObjectName("turn")
@@ -328,6 +336,8 @@ class MainWindow(QMainWindow):
             "Confirm move & give chat 30 seconds", lambda: self.invoke("confirm"), primary=True
         )
         layout.addWidget(self.confirm)
+        self.concede_button = self.button("Concede round", self.concede_round)
+        layout.addWidget(self.concede_button)
         row = QHBoxLayout()
         self.start = self.button(
             "Randomize who starts", lambda: self.invoke("start", first="random")
@@ -345,10 +355,37 @@ class MainWindow(QMainWindow):
         self.retry = self.button("Reopen voting · 30 seconds", lambda: self.invoke("retry"))
         row.addWidget(self.retry)
         layout.addLayout(row)
-        self.practice = QCheckBox("Test mode — simulated viewers, no Twitch login needed")
+        self.phrase_editor = QPlainTextEdit("\n".join(self.app.settings.concede_phrases))
+        self.phrase_editor.setAccessibleName("Chat concede phrases")
+        self.phrase_editor.setPlaceholderText(
+            "One phrase per line; leave blank to disable chat concessions"
+        )
+        self.phrase_editor.setFixedHeight(90)
+        layout.addWidget(QLabel("Chat concede phrases · one per line"))
+        layout.addWidget(self.phrase_editor)
+        layout.addWidget(self.button("Save concede phrases", self.save_concede_phrases))
+        self.phrase_status = QLabel(
+            "Exact messages, ignoring case and extra spaces. Changes apply next chat turn."
+        )
+        self.phrase_status.setWordWrap(True)
+        layout.addWidget(self.phrase_status)
+        self.scores = QLabel()
+        layout.addWidget(self.scores)
+        layout.addStretch()
+        self.tabs.addTab(page, "Game")
+
+    def build_practice(self) -> None:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        help_text = QLabel(
+            "Practice without Twitch. Switch this off before connecting Twitch. Use the Game tab to see the board and make streamer moves."
+        )
+        help_text.setWordWrap(True)
+        layout.addWidget(help_text)
+        self.practice = QCheckBox("Practice mode — no Twitch login needed")
         self.practice.clicked.connect(lambda: self.invoke("practice"))
         layout.addWidget(self.practice)
-        self.test_group = QGroupBox("Test controls")
+        self.test_group = QGroupBox("Practice controls")
         test = QVBoxLayout(self.test_group)
         row = QHBoxLayout()
         self.streamer_first = self.button(
@@ -358,7 +395,7 @@ class MainWindow(QMainWindow):
         self.chat_first = self.button("Chat first", lambda: self.invoke("start", first="chat"))
         row.addWidget(self.chat_first)
         self.finish_vote = self.button(
-            "Finish test vote now", lambda: self.invoke("finish_test_vote")
+            "Finish practice vote now", lambda: self.invoke("finish_test_vote")
         )
         test.addLayout(row)
         test.addWidget(self.finish_vote)
@@ -367,12 +404,12 @@ class MainWindow(QMainWindow):
         self.test_user.setPlaceholderText("Simulated viewer name")
         row.addWidget(self.test_user)
         self.test_number = QLineEdit()
-        self.test_number.setPlaceholderText("Vote 1–9")
-        self.test_number.setMaxLength(1)
-        self.test_number.setMaximumWidth(100)
+        self.test_number.setPlaceholderText("Number or concede phrase")
+        self.test_number.setMaxLength(200)
+        self.test_number.setMinimumWidth(140)
         row.addWidget(self.test_number)
         self.test_cast = self.button(
-            "Cast test vote",
+            "Cast practice vote",
             lambda: self.invoke(
                 "test_vote", user=self.test_user.text(), text=self.test_number.text()
             ),
@@ -380,10 +417,36 @@ class MainWindow(QMainWindow):
         row.addWidget(self.test_cast)
         test.addLayout(row)
         layout.addWidget(self.test_group)
-        self.scores = QLabel()
-        layout.addWidget(self.scores)
         layout.addStretch()
-        self.tabs.addTab(page, "Game")
+        self.tabs.addTab(page, "Practice")
+
+    def save_concede_phrases(self) -> None:
+        try:
+            self.app.action(
+                "concede_phrases", {"phrases": self.phrase_editor.toPlainText().splitlines()}
+            )
+        except (ValueError, OSError) as error:
+            self.phrase_status.setText(str(error))
+        else:
+            self.phrase_editor.setPlainText("\n".join(self.app.settings.concede_phrases))
+            self.phrase_status.setText(
+                "Saved. Applies next chat turn. Empty list disables chat concessions."
+            )
+        self.refresh()
+
+    def concede_round(self) -> None:
+        if self.app.game.phase != "streamer":
+            return
+        if (
+            QMessageBox.question(
+                self,
+                "Concede this round?",
+                "Give this round to chat?",
+                defaultButton=QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
+            self.invoke("concede")
 
     def reset_round(self) -> None:
         with self.app.lock:
@@ -451,7 +514,7 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(self.results, 1)
         hint = QLabel(
-            "Only chat:read permission is requested. Tokens remain in memory; log in each launch.\nRepeated votes from one viewer count once. Turn Test mode off to test through real Twitch chat."
+            "Only chat:read permission is requested. Tokens remain in memory; log in each launch.\nRepeated votes from one viewer count once. Turn Practice mode off to use real Twitch chat."
         )
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -596,8 +659,7 @@ class MainWindow(QMainWindow):
             self.preview.update_from(self.app)
             seconds = str(game.state(time.monotonic())["seconds"])
             self.turn.setText(
-                ("TEST MODE · " if self.app.practice else "")
-                + {
+                {
                     "ready": "Ready to play",
                     "streamer": "Streamer’s turn · select an empty square",
                     "chat": "Voting paused" if game.paused else "Chat is voting · " + seconds + "s",
@@ -607,7 +669,7 @@ class MainWindow(QMainWindow):
             )
             self.message.setText(game.message)
             self.vote_summary.setText(
-                f"{len(game.votes)} unique vote(s) this turn · one current vote per viewer"
+                f"{len(game.votes)} unique vote(s) · {game.concession_votes()} to concede"
             )
             duration = self.app.settings.vote_seconds
             self.vote_duration.blockSignals(True)
@@ -617,6 +679,7 @@ class MainWindow(QMainWindow):
             self.retry.setText(f"Reopen voting · {duration} seconds")
             available = self.app.connected or self.app.practice
             self.start.setEnabled(available and game.phase in ("ready", "over"))
+            self.concede_button.setEnabled(game.phase == "streamer")
             self.confirm.setEnabled(
                 available and game.phase == "streamer" and game.pending is not None
             )

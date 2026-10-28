@@ -212,3 +212,27 @@ def test_invalid_vote_duration_is_rejected(app: Application, seconds: object) ->
     assert app.settings.vote_seconds == app.game.vote_seconds == 30
     app.settings.file.write_text(json.dumps({"vote_seconds": seconds}))
     assert Settings.load(app.settings.file.parent).vote_seconds == 30
+
+
+def test_concede_phrase_validation_persistence_and_action(app: Application) -> None:
+    app.action("concede_phrases", {"phrases": [" Give   Up ", "give up", "we surrender", ""]})
+    restored = Settings.load(app.settings.file.parent)
+    assert restored.concede_phrases == ("give up", "we surrender")
+    app.action("practice", {})
+    app.action("start", {"first": "streamer"})
+    app.action("concede", {})
+    assert app.game.winner == "O"
+    app.action("concede_phrases", {"phrases": []})
+    assert Settings.load(app.settings.file.parent).concede_phrases == ()
+
+
+@pytest.mark.parametrize("phrases", [None, "rigged", [1], ["123"], ["x" * 81], ["a"] * 51])
+def test_invalid_concede_phrases_are_rejected(app: Application, phrases: object) -> None:
+    with pytest.raises(ValueError):
+        app.action("concede_phrases", {"phrases": phrases})
+    app.settings.file.write_text(json.dumps({"concede_phrases": phrases}))
+    assert Settings.load(app.settings.file.parent).concede_phrases == (
+        "concede",
+        "give up",
+        "rigged",
+    )

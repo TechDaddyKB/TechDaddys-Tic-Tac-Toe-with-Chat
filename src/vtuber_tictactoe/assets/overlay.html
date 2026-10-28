@@ -50,7 +50,7 @@ function render(s){
  s.board.forEach((v,i)=>{const c=cells[i];c.classList.toggle('filled',!!v);c.classList.toggle('win',s.winning_line.includes(i));
  if(c.dataset.mark!==v){c.querySelector('.mark')?.remove();if(v){const shape=v==='X'?'<path d="M20 20L80 80 M80 20L20 80"/>':'<circle cx="50" cy="50" r="34"/>';c.insertAdjacentHTML('beforeend','<svg class="mark '+v.toLowerCase()+'" viewBox="0 0 100 100">'+shape+'</svg>')}c.dataset.mark=v}});
  const status=document.getElementById('status'), footer=document.getElementById('footer');
- status.textContent=s.phase==='chat'?(s.paused?'PAUSED':s.seconds+'s · VOTE'):s.phase==='streamer'?"STREAMER'S TURN":s.phase==='over'?'GG ♡':s.phase==='no_votes'?'NO VOTES':'READY';
+ status.textContent=s.phase==='chat'?(s.paused?'PAUSED':s.seconds+'s · VOTE'):s.phase==='streamer'?"STREAMER'S TURN":s.phase==='over'?(s.conceded_by==='X'?'STREAMER CONCEDED':s.conceded_by==='O'?'CHAT CONCEDED':'GG ♡'):s.phase==='no_votes'?'NO VOTES':'READY';
  footer.textContent=s.phase==='chat'?(s.paused?'Voting paused':'Vote in chat · '+s.voters+' vote'+(s.voters===1?'':'s')):s.phase==='over'?s.message:s.phase==='no_votes'?'Waiting to reopen voting':'X · streamer  /  O · chat';
  const banner=document.getElementById('voteBanner');banner.className=s.phase==='chat'?(s.paused?'paused':'voting'):'';banner.textContent=s.paused?'VOTING PAUSED':'CHAT: VOTE · '+s.seconds+'s';
 }

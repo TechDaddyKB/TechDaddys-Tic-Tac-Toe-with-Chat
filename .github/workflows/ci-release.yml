@@ -86,7 +86,7 @@ jobs:
   publish:
     name: Attach executables to GitHub release
     if: >-
-      github.event_name == 'release' || (github.event_name == 'push' && github.event.head_commit.message == 'Release v0.2.1: configurable chat vote time')
+      github.event_name == 'release' || (github.event_name == 'push' && github.event.head_commit.message == 'Release v1.0.0: community showdown')
     needs: [build, browser]
     runs-on: ubuntu-22.04
     permissions:
@@ -99,7 +99,7 @@ jobs:
           pattern: release-*
           path: release
           merge-multiple: true
-      - name: Verify requested security fix and publish v0.2.1
+      - name: Verify requested security fix and publish v1.0.0
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -108,10 +108,10 @@ jobs:
           state="$(gh api "repos/$GH_REPO/code-scanning/alerts/1" --jq .state)"
           echo "Security alert #1: $state"
           test "$state" = fixed
-          gh release create v0.2.1 --target "$GITHUB_SHA" --title "v0.2.1 — Configurable chat vote time" --notes-file RELEASE-NOTES.md
+          gh release create v1.0.0 --target "$GITHUB_SHA" --title "v1.0.0 — Community showdown" --notes-file RELEASE-NOTES.md
       - name: Upload both platform packages and SHA256 checksums
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || 'v0.2.1' }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || 'v1.0.0' }}
         run: gh release upload "$RELEASE_TAG" release/* --clobber
