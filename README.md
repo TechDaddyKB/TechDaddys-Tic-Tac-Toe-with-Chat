@@ -161,7 +161,9 @@ SHA256 checksums are uploaded alongside the ZIPs. Build tools are only needed by
 
 GitHub Actions runs lint, both type checkers, formatting, unit/HTTP/transport tests, browser checks,
 and native Windows/Linux builds. Publishing a GitHub release runs the pipeline for that exact tag
-and attaches both platform ZIPs only after all checks pass. A release tag must match the version in
+and attaches both platform ZIPs only after all checks pass.
+The explicit main-branch commit `Release v0.2.0: native desktop controller` also publishes this
+release directly from CI after verifying security alert #1 is fixed; ordinary pushes do not publish. A release tag must match the version in
 `pyproject.toml` (for example, `v0.2.0`). Ordinary pushes and pull requests also run the checks/builds.
 
 The project is a tested first release, not a claim of completed platform acceptance testing.

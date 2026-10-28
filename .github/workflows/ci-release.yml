@@ -85,20 +85,32 @@ jobs:
 
   publish:
     name: Attach executables to GitHub release
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || (github.event_name == 'push' && github.event.head_commit.message == 'Release v0.2.0: native desktop controller')
     needs: [build, browser]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
+      security-events: read
     steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: release-*
           path: release
           merge-multiple: true
+      - name: Verify requested security fix and publish v0.2.0
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          state="$(gh api "repos/$GH_REPO/code-scanning/alerts/1" --jq .state)"
+          echo "Security alert #1: $state"
+          test "$state" = fixed
+          gh release create v0.2.0 --target "$GITHUB_SHA" --title "v0.2.0 — Native desktop controller" --notes-file RELEASE-NOTES.md
       - name: Upload both platform packages and SHA256 checksums
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || 'v0.2.0' }}
         run: gh release upload "$RELEASE_TAG" release/* --clobber
